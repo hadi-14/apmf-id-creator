@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { GraduationCap, LogIn, UserPlus, Shield, Download, Mail } from 'lucide-react';
+import { GraduationCap, LogIn, Shield, Download, Mail } from 'lucide-react';
 
 export default function HomePage() {
   return (
@@ -26,13 +26,6 @@ export default function HomePage() {
               >
                 <LogIn className="w-4 h-4" />
                 Login
-              </Link>
-              <Link
-                href="/register"
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
-              >
-                <UserPlus className="w-4 h-4" />
-                Register
               </Link>
             </div>
           </div>
@@ -87,19 +80,12 @@ export default function HomePage() {
         <div className="bg-gradient-to-r from-green-600 to-green-500 rounded-2xl shadow-2xl p-12 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Get Started Today</h2>
           <p className="text-lg mb-8 opacity-90">
-            Register now to get your digital student ID card and join the APMF IT Committee community
+            Sign in with your account to access your digital student ID card
           </p>
           <div className="flex gap-4 justify-center">
             <Link
-              href="/register"
-              className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition flex items-center gap-2"
-            >
-              <UserPlus className="w-5 h-5" />
-              Create Account
-            </Link>
-            <Link
               href="/login"
-              className="bg-green-700 text-white px-8 py-3 rounded-lg font-semibold hover:bg-green-800 transition flex items-center gap-2"
+              className="bg-white text-green-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition flex items-center gap-2"
             >
               <LogIn className="w-5 h-5" />
               Sign In

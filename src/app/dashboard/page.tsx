@@ -5,6 +5,24 @@ import { useRouter } from 'next/navigation';
 import NextImage from 'next/image';
 import { Upload, Download, LogOut, Loader2, User } from 'lucide-react';
 
+interface Course {
+  id: string;
+  name: string;
+}
+
+interface Slot {
+  id: string;
+  name: string;
+}
+
+interface StudentCourseEnrollment {
+  id: string;
+  courseId: string;
+  slotId: string;
+  course: Course;
+  slot: Slot;
+}
+
 interface Student {
   id: string;
   studentId: string;
@@ -12,10 +30,9 @@ interface Student {
   lastName: string;
   email: string;
   phoneNo: string;
-  slot: string;
-  courseName: string;
   photoUrl: string | null;
   createdAt: string;
+  enrollments: StudentCourseEnrollment[];
 }
 
 export default function DashboardPage() {
@@ -24,6 +41,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [selectedEnrollmentId, setSelectedEnrollmentId] = useState('');
   const idCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -41,6 +59,9 @@ export default function DashboardPage() {
 
       const data = await response.json();
       setStudent(data.student);
+      if (data.student.enrollments.length > 0) {
+        setSelectedEnrollmentId(data.student.enrollments[0].id);
+      }
     } catch (err) {
       console.error('Profile fetch error:', err);
       router.push('/login');
@@ -99,7 +120,10 @@ export default function DashboardPage() {
   };
 
   const handleDownloadID = async () => {
-    if (!student) return;
+    if (!student || !selectedEnrollmentId) return;
+
+    const enrollment = student.enrollments.find(e => e.id === selectedEnrollmentId);
+    if (!enrollment) return;
 
     try {
       const canvas = document.createElement('canvas');
@@ -164,20 +188,24 @@ export default function DashboardPage() {
 
       ctx.fillStyle = '#1f2937';
       ctx.font = 'bold 24px Arial';
-      ctx.fillText(`${student.firstName} ${student.lastName}`, width * 0.08, height * 0.78);
+      ctx.fillText(`${student.firstName} ${student.lastName}`, width * 0.08, height * 0.74);
+
+      ctx.fillStyle = '#16a34a';
+      ctx.font = 'bold 16px Arial';
+      ctx.fillText(enrollment.course.name, width * 0.08, height * 0.81);
 
       ctx.fillStyle = '#4b5563';
       ctx.font = '600 16px Arial';
-      ctx.fillText(student.studentId, width * 0.08, height * 0.82);
+      ctx.fillText(student.phoneNo, width * 0.08, height * 0.87);
 
       ctx.fillStyle = '#16a34a';
       ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'left';
-      ctx.fillText(student.courseName, width * 0.60, height * 0.40);
+      ctx.fillText(enrollment.course.name, width * 0.60, height * 0.40);
 
       ctx.fillStyle = '#16a34a';
       ctx.font = 'bold 18px Arial';
-      ctx.fillText(student.slot, width * 0.60, height * 0.48);
+      ctx.fillText(enrollment.slot.name, width * 0.60, height * 0.48);
 
       ctx.fillStyle = '#16a34a';
       ctx.font = '600 14px Arial';
@@ -188,7 +216,7 @@ export default function DashboardPage() {
           const url = URL.createObjectURL(blob);
           const link = document.createElement('a');
           link.href = url;
-          link.download = `${student.studentId}_ID_Card.png`;
+          link.download = `${student.studentId}_${enrollment.course.name}_ID_Card.png`;
           link.click();
           URL.revokeObjectURL(url);
         }
@@ -212,9 +240,7 @@ export default function DashboardPage() {
     return null;
   }
 
-  const issueDate = new Date(student.createdAt);
-  const expiryDate = new Date(issueDate);
-  expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+  const selectedEnrollment = student.enrollments.find(e => e.id === selectedEnrollmentId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 to-green-100 py-8 px-4">
@@ -255,7 +281,7 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Profile Photo</h2>
             
             <div className="flex flex-col items-center">
-              <div className="w-64 h-64 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center border-2 border-gray-300 relative">
+              <div className="w-64 h-64 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center border-2 border-gray-300 text-gray-700 relative">
                 {student.photoUrl ? (
                   <NextImage
                     src={student.photoUrl}
@@ -296,112 +322,147 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Student ID Card Preview */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
+          {/* ID Card Section */}
+          <div className="bg-white rounded-lg shadow-lg p-6 flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-800">Student ID Card</h2>
               <button
                 onClick={handleDownloadID}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                disabled={!selectedEnrollment}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400"
               >
                 <Download className="w-4 h-4" />
                 Download
               </button>
             </div>
 
-            {/* ID Card using template image */}
-            <div 
-              ref={idCardRef} 
-              data-id-card
-              className="relative w-full bg-gray-50 mx-auto overflow-hidden" 
-              style={{ 
-                aspectRatio: '1.586',
-                maxWidth: '800px'
-              }}
-            >
-              {/* Base template image */}
-              <NextImage 
-                src="/id-card-template.png" 
-                alt="ID Card Template"
-                fill
-                className="object-contain"
-                priority={false}
-              />
-              
-              {/* Overlay student photo */}
-              <div className="absolute" style={{ 
-                left: '6.5%', 
-                top: '24%', 
-                width: '29%', 
-                height: '47%' 
-              }}>
-                {student.photoUrl ? (
-                  <div className="relative w-full h-full rounded-2xl overflow-hidden">
-                    <NextImage
-                      src={student.photoUrl}
-                      alt={`${student.firstName} ${student.lastName}`}
-                      fill
-                      className="object-fill"
-                      priority={false}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full h-full bg-gray-300 rounded-2xl flex items-center justify-center">
-                    <User className="w-20 h-20 text-gray-500" />
-                  </div>
-                )}
-              </div>
-
-              {/* Student Name */}
-              <div className="absolute whitespace-nowrap" style={{ 
-                left: '8%', 
-                bottom: '22%',
-              }}>
-                <p className="text-gray-800 font-bold" style={{ fontSize: 'clamp(10px, 1.5vw, 18px)' }}>
-                  {student.firstName} {student.lastName}
-                </p>
-              </div>
-
-              {/* Student ID */}
-              <div className="absolute whitespace-nowrap" style={{ 
-                left: '8%', 
-                bottom: '18%',
-              }}>
-                <p className="text-gray-600 font-semibold" style={{ fontSize: 'clamp(8px, 1vw, 12px)' }}>
-                  {student.studentId}
-                </p>
-              </div>
-
-              {/* Course Name (right side) */}
-              <div className="absolute" style={{ 
-                left: '60%', 
-                top: '40%',
-              }}>
-                <p className="text-green-600 text-right break-words" style={{ fontSize: 'clamp(9px, 1.1vw, 14px)' }}>
-                  {student.courseName}
-                </p>
-              </div>
-
-              {/* Slot */}
-              <div className="absolute whitespace-nowrap" style={{ 
-                left: '60%', 
-                top: '48%',
-              }}>
-                <p className="text-green-600 text-right" style={{ fontSize: 'clamp(9px, 1.1vw, 14px)' }}>
-                  {student.slot}
-                </p>
-              </div>
-
-              {/* Email */}
-              <div className="absolute" style={{ 
-                left: '60%', 
-                top: '56%',
-              }}>
-                <p className="text-green-600 text-left break-all" style={{ fontSize: 'clamp(7px, 0.9vw, 11px)' }}>
-                  {student.email}
-                </p>
-              </div>
+            {/* Course & Slot Selector */}
+            <div className="mb-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Select Course & Slot
+              </label>
+              <select
+                value={selectedEnrollmentId}
+                onChange={(e) => setSelectedEnrollmentId(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 text-gray-700 rounded-lg focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-200"
+              >
+                <option value="">Select an enrollment</option>
+                {student.enrollments.map((enrollment) => (
+                  <option key={enrollment.id} value={enrollment.id}>
+                    {enrollment.course.name} - {enrollment.slot.name}
+                  </option>
+                ))}
+              </select>
+              {student.enrollments.length === 0 && (
+                <p className="text-gray-500 text-sm mt-2">No enrollments available. Please contact admin to add courses.</p>
+              )}
             </div>
+
+            {/* ID Card Preview */}
+            {selectedEnrollment && (
+              <div 
+                ref={idCardRef} 
+                data-id-card
+                className="relative w-full bg-gray-50 mx-auto overflow-hidden flex-1" 
+                style={{ 
+                  aspectRatio: '1.586',
+                  maxWidth: '100%'
+                }}
+              >
+                {/* Base template image */}
+                <NextImage 
+                  src="/id-card-template.png" 
+                  alt="ID Card Template"
+                  fill
+                  className="object-contain"
+                  priority={false}
+                />
+                
+                {/* Overlay student photo */}
+                <div className="absolute" style={{ 
+                  left: '6.5%', 
+                  top: '24%', 
+                  width: '29%', 
+                  height: '47%' 
+                }}>
+                  {student.photoUrl ? (
+                    <div className="relative w-full h-full rounded-2xl overflow-hidden">
+                      <NextImage
+                        src={student.photoUrl}
+                        alt={`${student.firstName} ${student.lastName}`}
+                        fill
+                        className="object-fill"
+                        priority={false}
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-full h-full bg-gray-300 rounded-2xl flex items-center justify-center">
+                      <User className="w-20 h-20 text-gray-500" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Student Name */}
+                <div className="absolute whitespace-nowrap" style={{ 
+                  left: '8%', 
+                  top: '71%',
+                }}>
+                  <p className="text-gray-800 font-bold" style={{ fontSize: 'clamp(10px, 1.5vw, 18px)' }}>
+                    {student.firstName} {student.lastName}
+                  </p>
+                </div>
+
+                {/* Course Name Below Name */}
+                <div className="absolute" style={{ 
+                  left: '8%', 
+                  top: '77%',
+                }}>
+                  <p className="text-green-600 font-semibold break-words" style={{ fontSize: 'clamp(8px, 1.1vw, 14px)', maxWidth: '200px' }}>
+                    {selectedEnrollment.course.name}
+                  </p>
+                </div>
+
+                {/* Student ID */}
+                <div className="absolute whitespace-nowrap" style={{ 
+                  left: '8%', 
+                  top: '82%',
+                }}>
+                  <p className="text-gray-600 font-semibold" style={{ fontSize: 'clamp(8px, 1vw, 12px)' }}>
+                    {student.phoneNo}
+                  </p>
+                </div>
+
+                {/* Course Name (right side) */}
+                <div className="absolute" style={{ 
+                  left: '60%', 
+                  top: '40%',
+                }}>
+                  <p className="text-green-600 text-right break-words" style={{ fontSize: 'clamp(9px, 1.1vw, 14px)' }}>
+                    {selectedEnrollment.course.name}
+                  </p>
+                </div>
+
+                {/* Slot */}
+                <div className="absolute whitespace-nowrap" style={{ 
+                  left: '60%', 
+                  top: '48%',
+                }}>
+                  <p className="text-green-600 text-right" style={{ fontSize: 'clamp(9px, 1.1vw, 14px)' }}>
+                    {selectedEnrollment.slot.name}
+                  </p>
+                </div>
+
+                {/* Email */}
+                <div className="absolute" style={{ 
+                  left: '60%', 
+                  top: '56%',
+                }}>
+                  <p className="text-green-600 text-left break-all" style={{ fontSize: 'clamp(7px, 0.9vw, 11px)' }}>
+                    {student.email}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

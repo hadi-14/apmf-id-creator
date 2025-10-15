@@ -7,21 +7,59 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Course {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  
+  enrollments StudentCourseEnrollment[]
+  
+  @@index([name])
+}
+
+model Slot {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  
+  enrollments StudentCourseEnrollment[]
+  
+  @@index([name])
+}
+
+model StudentCourseEnrollment {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  slotId    String
+  createdAt DateTime @default(now())
+  
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  slot    Slot    @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  
+  @@unique([studentId, courseId, slotId])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([slotId])
+}
+
 model Student {
-  id                String    @id @default(cuid())
+  id                String   @id @default(cuid())
+  studentId         String   @unique
   firstName         String
-  lastName          String
-  email             String    @unique
+  lastName          String?
+  email             String   @unique
   phoneNo           String
-  slot              String
-  courseName        String
   photoUrl          String?
   verificationCode  String?
   codeExpiry        DateTime?
-  isVerified        Boolean   @default(false)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
-
+  isVerified        Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  enrollments StudentCourseEnrollment[]
+  
   @@index([email])
+  @@index([studentId])
 }
-
