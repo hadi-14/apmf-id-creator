@@ -31,8 +31,12 @@ export default function LoginPage() {
       }
 
       setStep('code');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -57,8 +61,12 @@ export default function LoginPage() {
       }
 
       router.push('/dashboard');
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setLoading(false);
     }
@@ -128,7 +136,7 @@ export default function LoginPage() {
               </button>
 
               <p className="text-center text-gray-600 text-sm">
-                Don't have an account?{' '}
+                Don&apos;t have an account?{' '}
                 <a href="/register" className="text-green-600 hover:text-green-700 font-semibold">
                   Register here
                 </a>

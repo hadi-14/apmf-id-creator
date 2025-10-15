@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import NextImage from 'next/image';
 import { Upload, Download, LogOut, Loader2, User } from 'lucide-react';
 
 interface Student {
@@ -27,7 +28,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  });
 
   const fetchProfile = async () => {
     try {
@@ -81,8 +82,12 @@ export default function DashboardPage() {
       }
 
       await fetchProfile();
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setUploading(false);
     }
@@ -101,13 +106,11 @@ export default function DashboardPage() {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Set canvas size (using standard ID card dimensions)
-      const width = 1016; // ~85.6mm at 300dpi
-      const height = 641;  // ~54mm at 300dpi (aspect ratio 1.586)
+      const width = 1016;
+      const height = 641;
       canvas.width = width;
       canvas.height = height;
 
-      // Load the template image
       const templateImg = new Image();
       templateImg.crossOrigin = 'anonymous';
       
@@ -117,10 +120,8 @@ export default function DashboardPage() {
         templateImg.src = '/id-card-template.png';
       });
 
-      // Draw template
       ctx.drawImage(templateImg, 0, 0, width, height);
 
-      // Draw student photo if exists
       if (student.photoUrl) {
         try {
           const photoImg = new Image();
@@ -132,13 +133,11 @@ export default function DashboardPage() {
             photoImg.src = student.photoUrl!;
           });
 
-          // Photo position and size (6.5%, 24%, 29%, 47%)
           const photoX = width * 0.065;
           const photoY = height * 0.24;
           const photoW = width * 0.29;
           const photoH = height * 0.47;
 
-          // Create rounded rectangle clipping path
           ctx.save();
           const radius = 20;
           ctx.beginPath();
@@ -161,36 +160,29 @@ export default function DashboardPage() {
         }
       }
 
-      // Draw text elements
       ctx.textBaseline = 'top';
 
-      // Student Name (left bottom, 22%)
       ctx.fillStyle = '#1f2937';
       ctx.font = 'bold 24px Arial';
       ctx.fillText(`${student.firstName} ${student.lastName}`, width * 0.08, height * 0.78);
 
-      // Student ID (left bottom, 18%)
       ctx.fillStyle = '#4b5563';
       ctx.font = '600 16px Arial';
       ctx.fillText(student.studentId, width * 0.08, height * 0.82);
 
-      // Course Name (right side, 40%)
       ctx.fillStyle = '#16a34a';
       ctx.font = 'bold 18px Arial';
       ctx.textAlign = 'left';
       ctx.fillText(student.courseName, width * 0.60, height * 0.40);
 
-      // Slot (right side, 48%)
       ctx.fillStyle = '#16a34a';
       ctx.font = 'bold 18px Arial';
       ctx.fillText(student.slot, width * 0.60, height * 0.48);
 
-      // Email (right side, 56%)
       ctx.fillStyle = '#16a34a';
       ctx.font = '600 14px Arial';
       ctx.fillText(student.email, width * 0.60, height * 0.56);
 
-      // Convert canvas to blob and download
       canvas.toBlob((blob) => {
         if (blob) {
           const url = URL.createObjectURL(blob);
@@ -263,12 +255,14 @@ export default function DashboardPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Profile Photo</h2>
             
             <div className="flex flex-col items-center">
-              <div className="w-64 h-64 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center border-2 border-gray-300">
+              <div className="w-64 h-64 bg-gray-100 rounded-lg overflow-hidden mb-4 flex items-center justify-center border-2 border-gray-300 relative">
                 {student.photoUrl ? (
-                  <img
+                  <NextImage
                     src={student.photoUrl}
                     alt={`${student.firstName} ${student.lastName}`}
-                    className="w-full h-full object-cover"
+                    fill
+                    className="object-cover"
+                    priority={false}
                   />
                 ) : (
                   <User className="w-32 h-32 text-gray-400" />
@@ -319,17 +313,19 @@ export default function DashboardPage() {
             <div 
               ref={idCardRef} 
               data-id-card
-              className="relative w-full bg-gray-50 mx-auto" 
+              className="relative w-full bg-gray-50 mx-auto overflow-hidden" 
               style={{ 
                 aspectRatio: '1.586',
                 maxWidth: '800px'
               }}
             >
               {/* Base template image */}
-              <img 
+              <NextImage 
                 src="/id-card-template.png" 
                 alt="ID Card Template"
-                className="absolute inset-0 w-full h-full object-contain"
+                fill
+                className="object-contain"
+                priority={false}
               />
               
               {/* Overlay student photo */}
@@ -340,11 +336,15 @@ export default function DashboardPage() {
                 height: '47%' 
               }}>
                 {student.photoUrl ? (
-                  <img
-                    src={student.photoUrl}
-                    alt={`${student.firstName} ${student.lastName}`}
-                    className="w-full h-full object-fill rounded-2xl"
-                  />
+                  <div className="relative w-full h-full rounded-2xl overflow-hidden">
+                    <NextImage
+                      src={student.photoUrl}
+                      alt={`${student.firstName} ${student.lastName}`}
+                      fill
+                      className="object-fill"
+                      priority={false}
+                    />
+                  </div>
                 ) : (
                   <div className="w-full h-full bg-gray-300 rounded-2xl flex items-center justify-center">
                     <User className="w-20 h-20 text-gray-500" />

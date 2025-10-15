@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { mkdir } from 'fs/promises';
 import { join } from 'path';
 import { prisma } from '@/lib/prisma';
 import { verifyToken } from '@/lib/auth';
