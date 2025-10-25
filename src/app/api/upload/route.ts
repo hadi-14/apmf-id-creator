@@ -1,9 +1,8 @@
+import { put } from '@vercel/blob';
 import { NextRequest, NextResponse } from 'next/server';
-import { mkdir } from 'fs/promises';
-import { join } from 'path';
-import { prisma } from '@/lib/prisma';
-import { verifyToken } from '@/lib/auth';
 import sharp from 'sharp';
+import { prisma } from '@/lib/prisma'; // Adjust path as needed
+import { verifyToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,35 +34,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
     }
 
-    // Create upload directory
-    const uploadDir = join(process.cwd(), 'public', 'uploads');
-    await mkdir(uploadDir, { recursive: true });
+    // Process and optimize image
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    const optimizedBuffer = await sharp(buffer)
+      .resize(400, 400, { fit: 'cover' })
+      .jpeg({ quality: 90 })
+      .toBuffer();
 
     // Generate unique filename
     const timestamp = Date.now();
     const filename = `${payload.studentId}-${timestamp}.jpg`;
-    const filepath = join(uploadDir, filename);
 
-    // Process and save image
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    // Resize and optimize image
-    await sharp(buffer)
-      .resize(400, 400, { fit: 'cover' })
-      .jpeg({ quality: 90 })
-      .toFile(filepath);
+    // Upload to Vercel Blob
+    const blob = await put(filename, optimizedBuffer, {
+      access: 'public',
+      contentType: 'image/jpeg',
+    });
 
     // Update student record
-    const photoUrl = `/uploads/${filename}`;
     await prisma.student.update({
       where: { id: payload.studentId as string },
-      data: { photoUrl },
+      data: { photoUrl: blob.url },
     });
 
     return NextResponse.json({
       success: true,
-      photoUrl,
+      photoUrl: blob.url,
     });
   } catch (error) {
     console.error('Upload error:', error);

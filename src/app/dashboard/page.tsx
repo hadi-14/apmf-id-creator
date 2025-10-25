@@ -46,7 +46,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchProfile();
-  });
+  }, []);
 
   const fetchProfile = async () => {
     try {
@@ -102,7 +102,8 @@ export default function DashboardPage() {
         throw new Error(data.error || 'Upload failed');
       }
 
-      await fetchProfile();
+      // Update student with new photo URL from Vercel Blob
+      setStudent(prev => prev ? { ...prev, photoUrl: data.photoUrl } : null);
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(err.message);
