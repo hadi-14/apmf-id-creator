@@ -1,8 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Loader2, Eye, EyeOff, LogOut, Users, X, Edit2, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, LogOut, Users, X, Edit2, Check, Upload } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -38,12 +37,10 @@ interface Student {
 type Tab = 'courses' | 'slots' | 'students';
 
 export default function AdminPage() {
-  const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState<Tab>('courses');
@@ -78,6 +75,10 @@ export default function AdminPage() {
   const [addingEnrollment, setAddingEnrollment] = useState(false);
   const [studentTab, setStudentTab] = useState<'list' | 'enrollments'>('list');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkImportLoading, setBulkImportLoading] = useState(false);
+  const [importMessage, setImportMessage] = useState('');
+  const [importStats, setImportStats] = useState<{ success: number; failed: number } | null>(null);
 
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'apmf2025';
 
@@ -474,6 +475,101 @@ export default function AdminPage() {
     }
   };
 
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setBulkImportLoading(true);
+    setImportMessage('');
+    setImportStats(null);
+    setError('');
+
+    try {
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      
+      if (lines.length < 2) {
+        throw new Error('CSV must contain header row and at least one data row');
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      const requiredFields = ['firstname', 'lastname', 'email', 'phoneno', 'studentid', 'course', 'slot'];
+      const missingFields = requiredFields.filter(field => !headers.includes(field));
+      
+      if (missingFields.length > 0) {
+        throw new Error(`Missing required columns: ${missingFields.join(', ')}`);
+      }
+
+      const students = [];
+      const errors = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        
+        if (values.every(v => v === '')) continue;
+
+        const rowData: Record<string, string> = {};
+        headers.forEach((header, index) => {
+          rowData[header] = values[index] || '';
+        });
+
+        if (!rowData.firstname || !rowData.lastname || !rowData.email || !rowData.phoneno || !rowData.studentid) {
+          errors.push(`Row ${i + 1}: Missing required student fields`);
+          continue;
+        }
+
+        students.push({
+          firstName: rowData.firstname,
+          lastName: rowData.lastname,
+          email: rowData.email,
+          phoneNo: rowData.phoneno,
+          studentId: rowData.studentid,
+          course: rowData.course || '',
+          slot: rowData.slot || '',
+        });
+      }
+
+      if (students.length === 0) {
+        throw new Error('No valid student records found in CSV');
+      }
+
+      const response = await fetch('/api/admin/students/bulk-import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ students }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to import students');
+      }
+
+      setImportStats({
+        success: data.successCount || 0,
+        failed: data.failedCount || 0,
+      });
+      
+      setImportMessage(`✓ Import completed: ${data.successCount} students added, ${data.failedCount} failed`);
+      await fetchStudents();
+      setShowBulkImport(false);
+      
+      setTimeout(() => {
+        setImportMessage('');
+        setImportStats(null);
+      }, 5000);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to import students');
+      }
+    } finally {
+      setBulkImportLoading(false);
+      e.target.value = '';
+    }
+  };
+
   const handleLogout = () => {
     setIsAuthenticated(false);
     setPassword('');
@@ -525,7 +621,6 @@ export default function AdminPage() {
               type="submit"
               className="w-full bg-green-600 text-white py-3 rounded-lg font-semibold hover:bg-green-700 transition flex items-center justify-center gap-2"
             >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : null}
               Login
             </button>
           </form>
@@ -730,14 +825,70 @@ export default function AdminPage() {
             <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Add Student</h2>
-                <button
-                  onClick={() => setShowAddStudentForm(!showAddStudentForm)}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-                >
-                  <Plus className="w-4 h-4" />
-                  {showAddStudentForm ? 'Cancel' : 'Add New Student'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowBulkImport(!showBulkImport)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                  >
+                    <Upload className="w-4 h-4" />
+                    {showBulkImport ? 'Cancel' : 'Bulk Import CSV'}
+                  </button>
+                  <button
+                    onClick={() => setShowAddStudentForm(!showAddStudentForm)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                  >
+                    <Plus className="w-4 h-4" />
+                    {showAddStudentForm ? 'Cancel' : 'Add New Student'}
+                  </button>
+                </div>
               </div>
+
+              {importMessage && (
+                <div className={`mb-6 px-4 py-3 rounded-lg flex items-center justify-between ${
+                  importStats?.failed === 0 
+                    ? 'bg-green-50 border border-green-200 text-green-700'
+                    : 'bg-yellow-50 border border-yellow-200 text-yellow-700'
+                }`}>
+                  <span>{importMessage}</span>
+                  <button onClick={() => setImportMessage('')} className="text-current hover:opacity-70">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              )}
+
+              {showBulkImport && (
+                <div className="mb-6 p-4 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50">
+                  <div className="mb-4">
+                    <h3 className="font-semibold text-gray-800 mb-2">Import Students from CSV</h3>
+                    <p className="text-sm text-gray-600 mb-3">
+                      Required columns: firstName, lastName, email, phoneNo, studentId, course, slot
+                    </p>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Course and Slot names must match existing records. Leave empty for no enrollment.
+                    </p>
+                    <a 
+                      href="data:text/csv;charset=utf-8,firstName,lastName,email,phoneNo,studentId,course,slot%0AJohn,Doe,john@example.com,03001234567,APMF-2024-001,Web Development,Morning 9AM%0AJane,Smith,jane@example.com,03009876543,APMF-2024-002,Data Science,Afternoon 2PM"
+                      download="student_template.csv"
+                      className="text-blue-600 hover:text-blue-800 text-sm font-semibold"
+                    >
+                      📥 Download CSV Template
+                    </a>
+                  </div>
+                  <label className="flex items-center justify-center gap-3 px-4 py-3 border-2 border-blue-400 rounded-lg bg-white cursor-pointer hover:bg-blue-50 transition">
+                    <Upload className="w-5 h-5 text-blue-600" />
+                    <span className="text-gray-700 font-semibold">
+                      {bulkImportLoading ? 'Importing...' : 'Click to select CSV file or drag & drop'}
+                    </span>
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleBulkImport}
+                      disabled={bulkImportLoading}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              )}
 
               {showAddStudentForm && (
                 <form onSubmit={handleAddStudent} className="space-y-4 mb-6">
@@ -953,7 +1104,7 @@ export default function AdminPage() {
                     ) : students.length === 0 ? (
                       <p className="text-gray-500 text-center py-8">No students registered yet</p>
                     ) : filteredStudents.length === 0 ? (
-                      <p className="text-gray-500 text-center py-8">No students found matching "{searchQuery}"</p>
+                      <p className="text-gray-500 text-center py-8">No students found matching &quot;{searchQuery}&quot;</p>
                     ) : (
                       <div className="overflow-x-auto">
                         <table className="w-full">
