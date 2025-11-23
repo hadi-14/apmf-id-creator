@@ -1,46 +1,8 @@
+// File: /app/api/admin/students/[studentId]/email/route.ts
+
 import { prisma } from '@/lib/prisma';
 import { NextRequest, NextResponse } from 'next/server';
 
-// DELETE /api/admin/students/[studentId]
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ studentId: string }> }
-) {
-  try {
-    const { studentId } = await params;
-
-    const student = await prisma.student.findUnique({
-      where: { id: studentId },
-    });
-
-    if (!student) {
-      return NextResponse.json(
-        { error: 'Student not found' },
-        { status: 404 }
-      );
-    }
-
-    // Delete all enrollments first (due to foreign key constraints)
-    await prisma.studentCourseEnrollment.deleteMany({
-      where: { studentId },
-    });
-
-    // Then delete the student
-    await prisma.student.delete({
-      where: { id: studentId },
-    });
-
-    return NextResponse.json({ message: 'Student deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting student:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete student' },
-      { status: 500 }
-    );
-  }
-}
-
-// PATCH /api/admin/students/[studentId]/email
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ studentId: string }> }
@@ -56,7 +18,6 @@ export async function PATCH(
       );
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       return NextResponse.json(
@@ -76,7 +37,6 @@ export async function PATCH(
       );
     }
 
-    // Check if email already exists for another student
     const existingStudent = await prisma.student.findUnique({
       where: { email },
     });

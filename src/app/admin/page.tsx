@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Trash2, Loader2, Eye, EyeOff, LogOut, Users, X } from 'lucide-react';
+import { Plus, Trash2, Loader2, Eye, EyeOff, LogOut, Users, X, Edit2, Check } from 'lucide-react';
 
 interface Course {
   id: string;
@@ -62,6 +62,8 @@ export default function AdminPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [showAddStudentForm, setShowAddStudentForm] = useState(false);
+  const [editingStudentEmail, setEditingStudentEmail] = useState<string | null>(null);
+  const [editedEmail, setEditedEmail] = useState('');
   const [newStudent, setNewStudent] = useState({
     firstName: '',
     lastName: '',
@@ -74,8 +76,20 @@ export default function AdminPage() {
   const [selectedCourseForEnrollment, setSelectedCourseForEnrollment] = useState('');
   const [selectedSlotForEnrollment, setSelectedSlotForEnrollment] = useState('');
   const [addingEnrollment, setAddingEnrollment] = useState(false);
+  const [studentTab, setStudentTab] = useState<'list' | 'enrollments'>('list');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || 'apmf2025';
+
+  const filteredStudents = students.filter(student => {
+    const query = searchQuery.toLowerCase();
+    return (
+      student.firstName.toLowerCase().includes(query) ||
+      student.lastName.toLowerCase().includes(query) ||
+      student.email.toLowerCase().includes(query) ||
+      student.studentId.toLowerCase().includes(query)
+    );
+  });
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,6 +337,46 @@ export default function AdminPage() {
       }
     } finally {
       setAddingStudent(false);
+    }
+  };
+
+  const handleEditEmail = async (studentId: string) => {
+    if (!editedEmail.trim()) {
+      setError('Email cannot be empty');
+      return;
+    }
+
+    setError('');
+    setSuccessMessage('');
+
+    try {
+      const response = await fetch(`/api/admin/students/${studentId}/email`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: editedEmail }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update email');
+      }
+
+      // Update only the specific student record instead of fetching all
+      setStudents(students.map(s => 
+        s.id === studentId ? { ...s, email: editedEmail } : s
+      ));
+      
+      setEditingStudentEmail(null);
+      setEditedEmail('');
+      setSuccessMessage('Email updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Failed to update email');
+      }
     }
   };
 
@@ -840,68 +894,202 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* Students List */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Students</h2>
-
-              {loadingStudents ? (
-                <div className="flex justify-center py-12">
-                  <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+            {/* Students Tabs */}
+            <div className="bg-white rounded-lg shadow-lg">
+              <div className="border-b border-gray-200">
+                <div className="flex gap-0 px-6">
+                  <button
+                    onClick={() => setStudentTab('list')}
+                    className={`px-6 py-4 font-semibold text-sm border-b-2 transition ${
+                      studentTab === 'list'
+                        ? 'text-green-600 border-green-600'
+                        : 'text-gray-600 border-transparent hover:text-gray-800'
+                    }`}
+                  >
+                    Students List
+                  </button>
+                  <button
+                    onClick={() => setStudentTab('enrollments')}
+                    className={`px-6 py-4 font-semibold text-sm border-b-2 transition ${
+                      studentTab === 'enrollments'
+                        ? 'text-green-600 border-green-600'
+                        : 'text-gray-600 border-transparent hover:text-gray-800'
+                    }`}
+                  >
+                    Enrollments
+                  </button>
                 </div>
-              ) : students.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No students registered yet</p>
-              ) : (
-                <div className="space-y-4">
-                  {students.map((student) => (
-                    <div key={student.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h3 className="font-bold text-gray-800">{student.firstName} {student.lastName}</h3>
-                          <p className="text-sm text-gray-600">ID: {student.studentId}</p>
-                          <p className="text-sm text-gray-600">Email: {student.email}</p>
-                          <p className="text-sm text-gray-600">Phone: {student.phoneNo}</p>
-                        </div>
-                        <button
-                          onClick={() => handleDeleteStudent(student.id)}
-                          className="text-red-600 hover:text-red-800 transition p-2"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
+              </div>
+
+              <div className="p-6">
+                {/* Students List Tab */}
+                {studentTab === 'list' && (
+                  <div>
+                    <div className="flex items-center gap-4 mb-6">
+                      <h2 className="text-2xl font-bold text-gray-800">Students List</h2>
+                      <div className="flex-1 max-w-md">
+                        <input
+                          type="text"
+                          placeholder="Search by name, email, or student ID..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-green-600 focus:ring-2 focus:ring-green-100"
+                        />
                       </div>
-
-                      {student.enrollments.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-sm font-semibold text-gray-700 mb-2">Enrollments:</p>
-                          <div className="space-y-2">
-                            {student.enrollments.map((enrollment) => (
-                              <div
-                                key={enrollment.id}
-                                className="flex items-center justify-between bg-gray-50 p-2 rounded text-sm"
-                              >
-                                <span>
-                                  <strong>{enrollment.course.name}</strong> - {enrollment.slot.name}
-                                </span>
-                                <button
-                                  onClick={() => handleRemoveEnrollment(student.id, enrollment.id)}
-                                  className="text-red-600 hover:text-red-800 transition"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {student.enrollments.length === 0 && (
-                        <div className="mt-3 pt-3 border-t border-gray-200">
-                          <p className="text-sm text-gray-500 italic">No enrollments yet</p>
-                        </div>
+                      {searchQuery && (
+                        <button
+                          onClick={() => setSearchQuery('')}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
                       )}
                     </div>
-                  ))}
-                </div>
-              )}
+
+                    {loadingStudents ? (
+                      <div className="flex justify-center py-12">
+                        <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+                      </div>
+                    ) : students.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No students registered yet</p>
+                    ) : filteredStudents.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No students found matching "{searchQuery}"</p>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-100 border-b border-gray-300">
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Student ID</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Email</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Phone</th>
+                              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Enrollments</th>
+                              <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredStudents.map((student) => (
+                              <tr key={student.id} className="border-b border-gray-200 hover:bg-gray-50 transition">
+                                <td className="px-4 py-3 text-sm text-gray-800">{student.studentId}</td>
+                                <td className="px-4 py-3 text-sm font-medium text-gray-800">{student.firstName} {student.lastName}</td>
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  {editingStudentEmail === student.id ? (
+                                    <div className="flex gap-2 items-center">
+                                      <input
+                                        type="email"
+                                        value={editedEmail}
+                                        onChange={(e) => setEditedEmail(e.target.value)}
+                                        autoFocus
+                                        className="px-2 py-1 border-2 border-green-600 rounded flex-1 text-sm focus:outline-none"
+                                      />
+                                      <button
+                                        onClick={() => handleEditEmail(student.id)}
+                                        className="text-green-600 hover:text-green-800 transition p-1 flex-shrink-0"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          setEditingStudentEmail(null);
+                                          setEditedEmail('');
+                                        }}
+                                        className="text-gray-600 hover:text-gray-800 transition p-1 flex-shrink-0"
+                                      >
+                                        <X className="w-4 h-4" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        setEditingStudentEmail(student.id);
+                                        setEditedEmail(student.email);
+                                      }}
+                                      className="flex items-center justify-between w-full hover:bg-blue-50 px-2 py-1 rounded transition"
+                                    >
+                                      <span className="truncate">{student.email}</span>
+                                      <Edit2 className="w-4 h-4 text-blue-600 ml-2 flex-shrink-0" />
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-800">{student.phoneNo}</td>
+                                <td className="px-4 py-3 text-sm text-gray-800">
+                                  {student.enrollments.length > 0 ? (
+                                    <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-semibold">
+                                      {student.enrollments.length}
+                                    </span>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs">None</span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-center">
+                                  <button
+                                    onClick={() => handleDeleteStudent(student.id)}
+                                    className="text-red-600 hover:text-red-800 transition p-1 inline-flex"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        <div className="mt-4 text-sm text-gray-600 px-4">
+                          Showing {filteredStudents.length} of {students.length} students
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Enrollments Tab */}
+                {studentTab === 'enrollments' && (
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-800 mb-6">Student Enrollments</h2>
+
+                    {loadingStudents ? (
+                      <div className="flex justify-center py-12">
+                        <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+                      </div>
+                    ) : students.filter(s => s.enrollments.length > 0).length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">No enrollments yet</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {students.map((student) => (
+                          student.enrollments.length > 0 && (
+                            <div key={student.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-lg transition">
+                              <h4 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <span className="text-green-600">👤</span>
+                                {student.firstName} {student.lastName}
+                                <span className="text-gray-500 text-sm font-normal">({student.studentId})</span>
+                              </h4>
+                              <div className="space-y-2">
+                                {student.enrollments.map((enrollment) => (
+                                  <div
+                                    key={enrollment.id}
+                                    className="flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100 p-3 rounded text-sm border border-gray-200"
+                                  >
+                                    <div>
+                                      <strong className="text-green-700">{enrollment.course.name}</strong>
+                                      <span className="text-gray-500 mx-2">•</span>
+                                      <span className="text-gray-600">{enrollment.slot.name}</span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleRemoveEnrollment(student.id, enrollment.id)}
+                                      className="text-red-600 hover:text-red-800 transition p-1 hover:bg-red-50 rounded"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
